@@ -22,6 +22,7 @@
       <strong>{{ width }}×{{ height }}</strong> px<br>
       <strong>{{ acpectRatio }}</strong> (<i>{{ ratio }}</i>)
     </div>
+    <span v-if="field.title" class="title-overlay">{{field.title}}</span>
     <div v-if="field.showDimensions" class="type">
       {{ mimeType }}
     </div>
@@ -29,109 +30,109 @@
 </template>
 
 <script>
-  import ScissorsIcon from './icons/Scissors';
-  import GalleryItem from './GalleryItem';
+    import ScissorsIcon from './icons/Scissors';
+    import GalleryItem from './GalleryItem';
 
-  export default {
-    components: {
-      ScissorsIcon,
-      GalleryItem,
-    },
-    props: ['image', 'field', 'removable', 'editable', 'isCustomPropertiesEditable'],
-    data: () => ({
-      acceptedMimeTypes: ['image/jpg', 'image/jpeg', 'image/png'],
-      src: "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==",
-      width: undefined,
-      height: undefined,
-      acpectRatio: undefined,
-      ratio: undefined,
-    }),
-    computed: {
-      downloadUrl() {
-        return this.image.id ? `/nova-vendor/ebess/advanced-nova-media-library/download/${this.image.id}` : null;
-      },
-      croppable() {
-        return this.editable &&
-          this.field.croppable &&
-          this.acceptedMimeTypes.includes(this.mimeType);
-      },
-      mimeType() {
-        return this.image.mime_type || this.image.file.type;
-      },
-    },
-    watch: {
-      image: {
-        handler: 'getImage',
-        immediate: true
-      }
-    },
-    methods: {
-      showPreview() {
-        const blobUrl = this.image.file ? URL.createObjectURL(this.image.file) : this.image.__media_urls__.preview;
-        window.open(blobUrl, '_blank');
-      },
-      getImage() {
-        if (this.editable && this.image.__media_urls__.form) {
-          this.src = this.image.__media_urls__.form;
-        } else if (!this.editable && this.image.__media_urls__.detailView) {
-          this.src = this.image.__media_urls__.detailView;
-        } else if (this.isVideo(this.image.__media_urls__.__original__)) {
-          //Seconds to seek to, to get thumbnail of video
-          let seconds = 1;  //TODO get this from the field instead of hardcoding it here
-          this.getVideoThumbnail(this.image.__media_urls__.__original__, seconds);
-        } else {
-          this.src = this.image.__media_urls__.__original__;
-        }
+    export default {
+        components: {
+            ScissorsIcon,
+            GalleryItem,
+        },
+        props: ['image', 'field', 'removable', 'editable', 'isCustomPropertiesEditable'],
+        data: () => ({
+            acceptedMimeTypes: ['image/jpg', 'image/jpeg', 'image/png'],
+            src: "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==",
+            width: undefined,
+            height: undefined,
+            acpectRatio: undefined,
+            ratio: undefined,
+        }),
+        computed: {
+            downloadUrl() {
+                return this.image.id ? `/nova-vendor/ebess/advanced-nova-media-library/download/${this.image.id}` : null;
+            },
+            croppable() {
+                return this.editable &&
+                    this.field.croppable &&
+                    this.acceptedMimeTypes.includes(this.mimeType);
+            },
+            mimeType() {
+                return this.image.mime_type || this.image.file.type;
+            },
+        },
+        watch: {
+            image: {
+                handler: 'getImage',
+                immediate: true
+            }
+        },
+        methods: {
+            showPreview() {
+                const blobUrl = this.image.file ? URL.createObjectURL(this.image.file) : this.image.__media_urls__.preview;
+                window.open(blobUrl, '_blank');
+            },
+            getImage() {
+                if (this.editable && this.image.__media_urls__.form) {
+                    this.src = this.image.__media_urls__.form;
+                } else if (!this.editable && this.image.__media_urls__.detailView) {
+                    this.src = this.image.__media_urls__.detailView;
+                } else if (this.isVideo(this.image.__media_urls__.__original__)) {
+                    //Seconds to seek to, to get thumbnail of video
+                    let seconds = 1;  //TODO get this from the field instead of hardcoding it here
+                    this.getVideoThumbnail(this.image.__media_urls__.__original__, seconds);
+                } else {
+                    this.src = this.image.__media_urls__.__original__;
+                }
 
-        if (this.field.showDimensions) {
-          setTimeout(this.calculateDimensions);
-        }
-      },
-      getVideoThumbnail(path, secs = 0) {
-        const video = document.createElement('video');
-        video.onloadedmetadata = () => {
-          video.currentTime = Math.min(Math.max(0, (secs < 0 ? video.duration : 0) + secs), video.duration);
-        };
-        video.onseeked = (e) => {
-          const canvas = document.createElement('canvas');
-          canvas.height = video.videoHeight;
-          canvas.width = video.videoWidth;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          this.src = canvas.toDataURL();
-        };
-        video.src = path;
-      },
-      isVideo(mediaPath) {
-        if (mediaPath.startsWith("data:video"))
-          return true;
-        //TODO better video detection
-        const supportedExtensions = [".mp4", ".ogv", ".webm"];
-        return supportedExtensions.some((suffix) => {
-          return mediaPath.endsWith(suffix)
-        });
-      },
-      calculateDimensions() {
-        if (this.$refs.image.complete) {
-          this.width = this.$refs.image.naturalWidth;
-          this.height = this.$refs.image.naturalHeight;
-          this.ratio = Math.round((this.width / this.height) * 100) / 100;
+                if (this.field.showDimensions) {
+                    setTimeout(this.calculateDimensions);
+                }
+            },
+            getVideoThumbnail(path, secs = 0) {
+                const video = document.createElement('video');
+                video.onloadedmetadata = () => {
+                    video.currentTime = Math.min(Math.max(0, (secs < 0 ? video.duration : 0) + secs), video.duration);
+                };
+                video.onseeked = (e) => {
+                    const canvas = document.createElement('canvas');
+                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    this.src = canvas.toDataURL();
+                };
+                video.src = path;
+            },
+            isVideo(mediaPath) {
+                if (mediaPath.startsWith("data:video"))
+                    return true;
+                //TODO better video detection
+                const supportedExtensions = [".mp4", ".ogv", ".webm"];
+                return supportedExtensions.some((suffix) => {
+                    return mediaPath.endsWith(suffix)
+                });
+            },
+            calculateDimensions() {
+                if (this.$refs.image.complete) {
+                    this.width = this.$refs.image.naturalWidth;
+                    this.height = this.$refs.image.naturalHeight;
+                    this.ratio = Math.round((this.width / this.height) * 100) / 100;
 
-          const gcd = this.gcd(this.width, this.height);
-          this.acpectRatio = (this.width / gcd) + ':' + (this.height / gcd);
-        } else {
-          this.$refs.image.onload = this.calculateDimensions;
-        }
-      },
-      gcd(a, b) {
-        if (b === 0) {
-          return a;
-        }
+                    const gcd = this.gcd(this.width, this.height);
+                    this.acpectRatio = (this.width / gcd) + ':' + (this.height / gcd);
+                } else {
+                    this.$refs.image.onload = this.calculateDimensions;
+                }
+            },
+            gcd(a, b) {
+                if (b === 0) {
+                    return a;
+                }
 
-        return this.gcd(b, a % b);
-      }
-    },
-  };
+                return this.gcd(b, a % b);
+            }
+        },
+    };
 </script>
 
 <style lang="scss">
@@ -221,6 +222,20 @@
 
     .download {
       left: 10px;
+    }
+
+    .title-overlay {
+      color: #fff;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      max-width: 100%;
+      padding: 10px 24px;
+      font-size: 15px;
+      width: 100%;
+      font-weight: 300;
+      text-shadow: 0 3px 3px black;
+      background-color: rgba(0, 0, 0, .5) !important;
     }
   }
 </style>
