@@ -2,11 +2,20 @@
   <component :is="field.fullSize ? 'full-width-field' : 'default-field'" :field="field" full-width-content>
     <template slot="field">
       <div :class="{'px-8 pt-6': field.fullSize}">
-        <gallery slot="value" ref="gallery" v-if="hasSetInitialValue && !field.collection"
-                 v-model="value" editable custom-properties :field="field" :multiple="field.multiple"
-                 :has-error="hasError" :first-error="firstError"/>
-
+        <gallery slot="value"
+                 ref="gallery"
+                 v-if="hasSetInitialValue && !field.collection"
+                 v-model="value"
+                 editable
+                 custom-properties
+                 :field="field"
+                 :multiple="field.multiple"
+                 :has-error="hasError"
+                 :first-error="firstError"/>
         <div v-if="field.existingMedia">
+          <div v-if="value !== undefined  && value.length" class="block">
+            <img :src="imageUrl(value)" ref="image" class="gallery-image">
+          </div>
           <button type="button" class="form-file-btn btn btn-default btn-primary mt-2" @click="existingMediaOpen = true">
             {{ openExistingMediaLabel }}
           </button>
@@ -51,7 +60,7 @@
                 }
 
                 return this.__(`Use Existing ${type}`);
-            }
+            },
         },
         methods: {
             /*
@@ -67,6 +76,15 @@
                 this.value = value;
                 this.hasSetInitialValue = true;
             },
+
+            imageUrl(value) {
+                let url = value[0]['__media_urls__']['form'];
+                if (url.includes('?')) {
+                    return url;
+                }
+                return `${url}?mask=corners&w=200&h=200&bg=00354651`
+            },
+
 
             /**
              * Fill the given FormData object with the field's internal value.
@@ -110,9 +128,8 @@
 
             addExistingItem(item) {
                 if (!this.field.multiple) {
-                    this.value.splice(0, 1);
+                    this.value = [];
                 }
-
                 this.value.push(item);
             }
         },

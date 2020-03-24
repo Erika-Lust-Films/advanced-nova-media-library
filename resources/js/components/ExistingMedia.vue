@@ -39,7 +39,7 @@
 
       <div class="flex-grow overflow-x-hidden overflow-y-scroll">
         <!-- When we have results show them -->
-        <div class="flex flex-wrap -mx-4 -mb-8" v-if="items.length > 0">
+        <div class="flex flex-wrap -mx-4 -mb-8" v-if="items !== undefined && items.length > 0">
           <template v-for="(item, key) in items">
             <existing-media-item :item="item" :key="key" @select="$emit('select', item) && close()"></existing-media-item>
           </template>
@@ -47,7 +47,7 @@
 
         <!-- Show "Loading" or "No Results Found" text -->
         <h4 class="text-center m-8" v-if="loading">Loading...</h4>
-        <h4 class="text-center m-8" v-else-if="items.length === 0">No results found</h4>
+        <h4 class="text-center m-8" v-else-if="items === undefined || items.length === 0">No results found</h4>
       </div>
 
       <!-- Next page -->
@@ -99,7 +99,7 @@
         },
         computed: {
             showNextPage() {
-                return this.items.length === (this.requestParams.page * this.requestParams.per_page);
+                return this.items !== undefined && this.items.length === (this.requestParams.page * this.requestParams.per_page);
             }
         },
         methods: {
@@ -148,7 +148,7 @@
         watch: {
             open: function (newValue) {
                 if (newValue) {
-                    if (this.items.length === 0) {
+                    if (this.items === undefined || this.items.length === 0) {
                         this.refresh();
                     }
                     document.body.classList.add('overflow-x-hidden');

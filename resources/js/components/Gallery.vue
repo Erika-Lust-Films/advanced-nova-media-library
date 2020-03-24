@@ -28,7 +28,6 @@
           :fields="customPropertiesFields"
           @close="customPropertiesImageIndex = null"
       />
-      TEST
 
     </component>
 

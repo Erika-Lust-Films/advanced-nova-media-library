@@ -4,32 +4,27 @@ namespace Ebess\AdvancedNovaMediaLibrary\Fields;
 
 use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Laravel\Nova\Fields\Field;
 use Laravel\Nova\Http\Requests\NovaRequest;
 use Spatie\MediaLibrary\HasMedia\HasMedia;
 use Spatie\MediaLibrary\HasMedia\HasMediaTrait;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Illuminate\Support\Facades\Validator;
 
 class Media extends Field
 {
     use HandlesCustomPropertiesTrait, HandlesConversionsTrait, HandlesExistingMediaTrait;
 
     public $component = 'advanced-media-library-field';
-
+    public $meta = [ 'type' => 'media' ];
     protected $setFileNameCallback;
     protected $setNameCallback;
     protected $serializeMediaCallback;
     protected $responsive = false;
-
     protected $collectionMediaRules = [];
     protected $singleMediaRules = [];
-
     protected $customHeaders = [];
-
     protected $defaultValidatorRules = [];
-
-    public $meta = ['type' => 'media'];
 
     public function serializeMediaUsing(callable $serializeMediaUsing): self
     {
@@ -40,19 +35,25 @@ class Media extends Field
 
     public function fullSize(): self
     {
-        return $this->withMeta(['fullSize' => true]);
+        return $this->withMeta([ 'fullSize' => true ]);
     }
 
     public function rules($rules): self
     {
-        $this->collectionMediaRules = ($rules instanceof Rule || is_string($rules)) ? func_get_args() : $rules;
+        $this->collectionMediaRules =
+            ($rules instanceof Rule || is_string($rules))
+                ? func_get_args()
+                : $rules;
 
         return $this;
     }
 
     public function singleMediaRules($rules): self
     {
-        $this->singleMediaRules = ($rules instanceof Rule || is_string($rules)) ? func_get_args() : $rules;
+        $this->singleMediaRules =
+            ($rules instanceof Rule || is_string($rules))
+                ? func_get_args()
+                : $rules;
 
         return $this;
     }
@@ -107,135 +108,41 @@ class Media extends Field
     }
 
     /**
-     * @param HasMedia $model
-     */
-    protected function fillAttributeFromRequest(NovaRequest $request, $requestAttribute, $model, $attribute)
-    {
-        $attr = $request['__media__'] ?? [];
-        $data = $attr[$requestAttribute] ?? [];
-
-        if ($attribute === 'ComputedField') {
-            $attribute = call_user_func($this->computedCallback, $model);
-        }
-
-        collect($data)
-            ->filter(function ($value) {
-                return $value instanceof UploadedFile;
-            })
-            ->each(function ($media) use ($request, $requestAttribute) {
-                $requestToValidateSingleMedia = array_merge($request->toArray(), [
-                    $requestAttribute => $media,
-                ]);
-
-                Validator::make($requestToValidateSingleMedia, [
-                    $requestAttribute => array_merge($this->defaultValidatorRules, (array)$this->singleMediaRules),
-                ])->validate();
-            });
-
-        $requestToValidateCollectionMedia = array_merge($request->toArray(), [
-            $requestAttribute => $data,
-        ]);
-
-        Validator::make($requestToValidateCollectionMedia, [$requestAttribute => $this->collectionMediaRules])
-            ->validate();
-
-        return function () use ($request, $data, $attribute, $model) {
-            $this->handleMedia($request, $model, $attribute, $data);
-
-            // fill custom properties for existing media
-            $this->fillCustomPropertiesFromRequest($request, $model, $attribute);
-        };
-    }
-
-    protected function handleMedia(NovaRequest $request, $model, $attribute, $data)
-    {
-        $remainingIds = $this->removeDeletedMedia($data, $model->getMedia($attribute));
-        $newIds = $this->addNewMedia($request, $data, $model, $attribute);
-        $existingIds = $this->addExistingMedia($request, $data, $model, $attribute, $model->getMedia($attribute));
-        $this->setOrder($remainingIds->union($newIds)->union($existingIds)->sortKeys()->all());
-    }
-
-    private function setOrder($ids)
-    {
-        $mediaClass = config('medialibrary.media_model');
-        $mediaClass::setNewOrder($ids);
-    }
-
-    private function addNewMedia(NovaRequest $request, $data, HasMedia $model, string $collection): Collection
-    {
-        return collect($data)
-            ->filter(function ($value) {
-                return $value instanceof UploadedFile;
-            })->map(function (UploadedFile $file, int $index) use ($request, $model, $collection) {
-                $media = $model->addMedia($file)->withCustomProperties($this->customProperties);
-
-                if($this->responsive) {
-                    $media->withResponsiveImages();
-                }
-
-                if(!empty($this->customHeaders)) {
-                    $media->addCustomHeaders($this->customHeaders);
-                }
-
-                if (is_callable($this->setFileNameCallback)) {
-                    $media->setFileName(
-                        call_user_func($this->setFileNameCallback, $file->getClientOriginalName(), $file->getClientOriginalExtension(), $model)
-                    );
-                }
-
-                if (is_callable($this->setNameCallback)) {
-                    $media->setName(
-                        call_user_func($this->setNameCallback, $file->getClientOriginalName(), $model)
-                    );
-                }
-
-                $media = $media->toMediaCollection($collection);
-
-                // fill custom properties for recently created media
-                $this->fillMediaCustomPropertiesFromRequest($request, $media, $index, $collection);
-
-                return $media->getKey();
-            });
-    }
-
-    private function removeDeletedMedia($data, Collection $medias): Collection
-    {
-        $remainingIds = collect($data)->filter(function ($value) {
-            return !$value instanceof UploadedFile;
-        })->map(function ($value) {
-            return $value;
-        });
-
-        $medias->pluck('id')->diff($remainingIds)->each(function ($id) use ($medias) {
-            /** @var Media $media */
-            if ($media = $medias->where('id', $id)->first()) {
-                $media->delete();
-            }
-        });
-
-        return $remainingIds->intersect($medias->pluck('id'));
-    }
-
-    /**
      * @param HasMedia|HasMediaTrait $resource
-     * @param null $attribute
+     * @param null                   $attribute
      */
     public function resolve($resource, $attribute = null)
     {
         $collectionName = $attribute ?? $this->attribute;
 
-        if ($collectionName === 'ComputedField') {
+        if ($collectionName === 'ComputedField')
+        {
             $collectionName = call_user_func($this->computedCallback, $resource);
         }
 
-		$this->value = $resource->getMedia($collectionName)
-            ->map(function (\Spatie\MediaLibrary\Models\Media $media) {
-                return array_merge($this->serializeMedia($media), ['__media_urls__' => $this->getConversionUrls($media)]);
-            });
+        $this->value =
+            $resource->getMedia($collectionName)
+                     ->map(
+                         function (\Spatie\MediaLibrary\Models\Media $media)
+                         {
+                             return array_merge($this->serializeMedia($media), [ '__media_urls__' => $this->getConversionUrls($media) ]);
+                         }
+                     );
 
-        if ($collectionName) {
+        if ($collectionName)
+        {
             $this->checkCollectionIsMultiple($resource, $collectionName);
         }
+    }
+
+    public function serializeMedia(\Spatie\MediaLibrary\Models\Media $media): array
+    {
+        if ($this->serializeMediaCallback)
+        {
+            return call_user_func($this->serializeMediaCallback, $media);
+        }
+
+        return $media->toArray();
     }
 
     /**
@@ -244,21 +151,12 @@ class Media extends Field
     protected function checkCollectionIsMultiple(HasMedia $resource, string $collectionName)
     {
         $resource->registerMediaCollections();
-        $isSingle = collect($resource->mediaCollections)
+        $isSingle =
+            collect($resource->mediaCollections)
                 ->where('name', $collectionName)
-                ->first()
-                ->singleFile ?? false;
+                ->first()->singleFile ?? false;
 
-        $this->withMeta(['multiple' => !$isSingle]);
-    }
-
-    public function serializeMedia(\Spatie\MediaLibrary\Models\Media $media): array
-    {
-        if ($this->serializeMediaCallback) {
-            return call_user_func($this->serializeMediaCallback, $media);
-        }
-
-        return $media->toArray();
+        $this->withMeta([ 'multiple' => !$isSingle ]);
     }
 
     /**
@@ -294,5 +192,169 @@ class Media extends Field
     public function conversionOnView(string $conversionOnDetailView): self
     {
         return $this->withMeta(compact('conversionOnDetailView'));
+    }
+
+    /**
+     * @param HasMedia $model
+     */
+    protected function fillAttributeFromRequest(NovaRequest $request, $requestAttribute, $model, $attribute)
+    {
+        $attr = $request[ '__media__' ] ?? [];
+        $data = $attr[ $requestAttribute ] ?? [];
+
+        if ($attribute === 'ComputedField')
+        {
+            $attribute = call_user_func($this->computedCallback, $model);
+        }
+
+        collect($data)
+            ->filter(
+                function ($value)
+                {
+                    return $value instanceof UploadedFile;
+                }
+            )
+            ->each(
+                function ($media) use ($request, $requestAttribute)
+                {
+                    $requestToValidateSingleMedia = array_merge(
+                        $request->toArray(),
+                        [
+                            $requestAttribute => $media,
+                        ]
+                    );
+
+                    Validator::make(
+                        $requestToValidateSingleMedia,
+                        [
+                            $requestAttribute => array_merge($this->defaultValidatorRules, (array) $this->singleMediaRules),
+                        ]
+                    )
+                             ->validate();
+                }
+            );
+
+        $requestToValidateCollectionMedia = array_merge(
+            $request->toArray(),
+            [
+                $requestAttribute => $data,
+            ]
+        );
+
+        Validator::make($requestToValidateCollectionMedia, [ $requestAttribute => $this->collectionMediaRules ])
+                 ->validate();
+
+        return function () use ($request, $data, $attribute, $model)
+        {
+            $this->handleMedia($request, $model, $attribute, $data);
+
+            // fill custom properties for existing media
+            $this->fillCustomPropertiesFromRequest($request, $model, $attribute);
+        };
+    }
+
+    protected function handleMedia(NovaRequest $request, $model, $attribute, $data)
+    {
+        $remainingIds = $this->removeDeletedMedia($data, $model->getMedia($attribute));
+        $newIds       = $this->addNewMedia($request, $data, $model, $attribute);
+        $existingIds  = $this->addExistingMedia($request, $data, $model, $attribute, $model->getMedia($attribute));
+        $this->setOrder(
+            $remainingIds->union($newIds)
+                         ->union($existingIds)
+                         ->sortKeys()
+                         ->all()
+        );
+    }
+
+    private function removeDeletedMedia($data, Collection $medias): Collection
+    {
+        $remainingIds =
+            collect($data)
+                ->filter(
+                    function ($value)
+                    {
+                        return !$value instanceof UploadedFile;
+                    }
+                )
+                ->map(
+                    function ($value)
+                    {
+                        return $value;
+                    }
+                );
+
+        $medias->pluck('id')
+               ->diff($remainingIds)
+               ->each(
+                   function ($id) use ($medias)
+                   {
+                       /** @var Media $media */
+                       if ($media =
+                           $medias->where('id', $id)
+                                  ->first()
+                       )
+                       {
+                           $media->delete();
+                       }
+                   }
+               );
+
+        return $remainingIds->intersect($medias->pluck('id'));
+    }
+
+    private function addNewMedia(NovaRequest $request, $data, HasMedia $model, string $collection): Collection
+    {
+        return collect($data)
+            ->filter(
+                function ($value)
+                {
+                    return $value instanceof UploadedFile;
+                }
+            )
+            ->map(
+                function (UploadedFile $file, int $index) use ($request, $model, $collection)
+                {
+                    $media =
+                        $model->addMedia($file)
+                              ->withCustomProperties($this->customProperties);
+
+                    if ($this->responsive)
+                    {
+                        $media->withResponsiveImages();
+                    }
+
+                    if (!empty($this->customHeaders))
+                    {
+                        $media->addCustomHeaders($this->customHeaders);
+                    }
+
+                    if (is_callable($this->setFileNameCallback))
+                    {
+                        $media->setFileName(
+                            call_user_func($this->setFileNameCallback, $file->getClientOriginalName(), $file->getClientOriginalExtension(), $model)
+                        );
+                    }
+
+                    if (is_callable($this->setNameCallback))
+                    {
+                        $media->setName(
+                            call_user_func($this->setNameCallback, $file->getClientOriginalName(), $model)
+                        );
+                    }
+
+                    $media = $media->toMediaCollection($collection);
+
+                    // fill custom properties for recently created media
+                    $this->fillMediaCustomPropertiesFromRequest($request, $media, $index, $collection);
+
+                    return $media->getKey();
+                }
+            );
+    }
+
+    private function setOrder($ids)
+    {
+        $mediaClass = config('medialibrary.media_model');
+        $mediaClass::setNewOrder($ids);
     }
 }
